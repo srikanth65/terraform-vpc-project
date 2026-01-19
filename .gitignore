@@ -1,0 +1,41 @@
+# Local .terraform directory and its contents (provider binaries, modules)
+.terraform/
+# Local .terraform directories
+**/.terraform/*
+
+# Terraform state files and their backups (sensitive data and infrastructure state)
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+
+# Ignore variables files
+*.auto.tfvars
+
+# Ignore override files
+*.tfoverride
+
+# Ignore environment-specific files
+.envrc
+
+# Variable definition files (can contain sensitive information like passwords, keys, etc.)
+# Exclude all by default, but consider specific overrides if necessary
+*.tfvars
+*.tfvars.json
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Plan files saved with the -out option
+# If you use a consistent naming convention for plan files, e.g., 'tfplan'
+*tfplan*
+
+# Terraform CLI configuration files
+.terraformrc
+terraform.rc
+
+# Terraform override files (if used for local-only overrides)
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
