@@ -63,6 +63,11 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
           "ec2:Describe*"
         ]
         Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestedRegion" = "us-east-2"
+          }
+        }
       },
       {
         Effect = "Allow"

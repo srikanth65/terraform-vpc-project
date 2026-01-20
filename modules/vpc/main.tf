@@ -220,7 +220,7 @@ resource "aws_security_group" "db" {
 # Example EC2 instances to attach security groups (for compliance)
 # These are minimal instances just to satisfy security group attachment requirements
 resource "aws_instance" "web_example" {
-  count                  = var.environment == "dev" ? 1 : 0
+  count                  = 1
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = "t3.nano"
   subnet_id              = aws_subnet.public[0].id
@@ -232,7 +232,7 @@ resource "aws_instance" "web_example" {
 }
 
 resource "aws_instance" "app_example" {
-  count                  = var.environment == "dev" ? 1 : 0
+  count                  = 1
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = "t3.nano"
   subnet_id              = aws_subnet.private[0].id

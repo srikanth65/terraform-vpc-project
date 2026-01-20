@@ -103,6 +103,29 @@ resource "aws_s3_bucket" "access_logs" {
   bucket = "${aws_s3_bucket.terraform_state.bucket}-access-logs"
 }
 
+resource "aws_s3_bucket_versioning" "access_logs" {
+  bucket = aws_s3_bucket.access_logs.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "access_logs" {
+  bucket = aws_s3_bucket.access_logs.id
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = aws_kms_key.terraform_state.arn
+      sse_algorithm     = "aws:kms"
+    }
+  }
+}
+
+resource "aws_s3_bucket_notification" "access_logs" {
+  bucket = aws_s3_bucket.access_logs.id
+
+  eventbridge = true
+}
+
 resource "aws_s3_bucket_public_access_block" "access_logs" {
   bucket = aws_s3_bucket.access_logs.id
 
@@ -124,7 +147,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "terraform_state" {
     }
 
     abort_incomplete_multipart_upload {
-      days_after_initiation = 7
+      days_after_initiation = 1
     }
   }
 }
@@ -138,6 +161,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "access_logs" {
 
     expiration {
       days = 30
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
     }
   }
 }

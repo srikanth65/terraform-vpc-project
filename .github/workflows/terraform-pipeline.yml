@@ -30,6 +30,7 @@ permissions:
   contents: read
   pull-requests: write
   security-events: write
+  actions: read
 
 jobs:
   quality-checks:
@@ -123,17 +124,18 @@ jobs:
 
     - name: Setup TFSec
       run: |
-        curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+        wget -q https://github.com/aquasecurity/tfsec/releases/latest/download/tfsec-linux-amd64 -O tfsec
+        chmod +x tfsec
         sudo mv tfsec /usr/local/bin/
 
     - name: TFSec Security Scan
       run: |
-        tfsec . --format sarif --out tfsec-results.sarif || true
+        tfsec . --format sarif --out tfsec-results.sarif --soft-fail || true
         # Ensure SARIF file exists
         if [ ! -f "tfsec-results.sarif" ]; then
-          echo '{"runs": [{"tool": {"driver": {"name": "TFSec"}}, "results": []}]}' > tfsec-results.sarif
+          echo '{"$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json","version":"2.1.0","runs":[{"tool":{"driver":{"name":"TFSec"}},"results":[]}]}' > tfsec-results.sarif
         fi
-        tfsec . || true
+        tfsec . --soft-fail || true
 
     - name: Upload TFSec SARIF
       uses: github/codeql-action/upload-sarif@v3
@@ -389,7 +391,9 @@ jobs:
     steps:
     - name: Slack Notification - Success
       uses: 8398a7/action-slack@v3
-      if: env.SLACK_WEBHOOK_URL != ''
+      if: secrets.SLACK_WEBHOOK_URL != ''
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       with:
         status: success
         webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -409,7 +413,7 @@ jobs:
 
     - name: Teams Notification - Success
       uses: skitionek/notify-microsoft-teams@master
-      if: env.TEAMS_WEBHOOK_URL != ''
+      if: secrets.TEAMS_WEBHOOK_URL != ''
       with:
         webhook_url: ${{ secrets.TEAMS_WEBHOOK_URL }}
         overwrite: |
@@ -456,7 +460,9 @@ jobs:
     steps:
     - name: Slack Notification - Failure
       uses: 8398a7/action-slack@v3
-      if: env.SLACK_WEBHOOK_URL != ''
+      if: secrets.SLACK_WEBHOOK_URL != ''
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       with:
         status: failure
         webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -478,7 +484,7 @@ jobs:
 
     - name: Teams Notification - Failure
       uses: skitionek/notify-microsoft-teams@master
-      if: env.TEAMS_WEBHOOK_URL != ''
+      if: secrets.TEAMS_WEBHOOK_URL != ''
       with:
         webhook_url: ${{ secrets.TEAMS_WEBHOOK_URL }}
         overwrite: |
