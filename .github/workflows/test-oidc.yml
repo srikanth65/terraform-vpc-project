@@ -1,0 +1,40 @@
+name: Test OIDC Connection
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test-oidc:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: us-east-2
+
+    - name: Test AWS Connection
+      run: |
+        echo "🔍 Testing AWS connection..."
+        aws sts get-caller-identity
+        echo "✅ AWS OIDC connection successful!"
+
+    - name: Test S3 Access
+      run: |
+        echo "🔍 Testing S3 access..."
+        aws s3 ls | grep terraform-state || echo "No terraform state buckets found"
+        echo "✅ S3 access test completed!"
+
+    - name: Notify Success
+      env:
+        SLACK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      run: |
+        if [ -n "$SLACK_URL" ]; then
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{"text":"✅ OIDC connection test successful! AWS authentication is working."}' \
+            "$SLACK_URL"
+        fi
