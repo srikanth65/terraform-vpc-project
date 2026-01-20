@@ -67,24 +67,28 @@ jobs:
         fi
 
     - name: Slack Alert - High Severity
-      if: ${{ steps.parse.outputs.has_vulnerabilities == 'true' && secrets.SLACK_SECURITY_WEBHOOK_URL != '' }}
+      env:
+        SLACK_SECURITY_URL: ${{ secrets.SLACK_SECURITY_WEBHOOK_URL }}
+        HAS_VULNERABILITIES: ${{ steps.parse.outputs.has_vulnerabilities }}
       run: |
-        curl -X POST -H 'Content-type: application/json' \
-          --data '{
-            "text": "🚨 SECURITY VULNERABILITIES DETECTED",
-            "attachments": [{
-              "color": "danger",
-              "fields": [
-                {"title": "Repository", "value": "${{ github.repository }}", "short": true},
-                {"title": "Branch", "value": "${{ github.ref_name }}", "short": true},
-                {"title": "Checkov Issues", "value": "${{ steps.parse.outputs.checkov_failed }}", "short": true},
-                {"title": "TFSec Issues", "value": "${{ steps.parse.outputs.tfsec_failed }}", "short": true},
-                {"title": "Total Issues", "value": "${{ steps.parse.outputs.total_issues }}", "short": true},
-                {"title": "View Details", "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}", "short": false}
-              ]
-            }]
-          }' \
-          ${{ secrets.SLACK_SECURITY_WEBHOOK_URL }}
+        if [ "$HAS_VULNERABILITIES" = "true" ] && [ -n "$SLACK_SECURITY_URL" ]; then
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{
+              "text": "🚨 SECURITY VULNERABILITIES DETECTED",
+              "attachments": [{
+                "color": "danger",
+                "fields": [
+                  {"title": "Repository", "value": "${{ github.repository }}", "short": true},
+                  {"title": "Branch", "value": "${{ github.ref_name }}", "short": true},
+                  {"title": "Checkov Issues", "value": "${{ steps.parse.outputs.checkov_failed }}", "short": true},
+                  {"title": "TFSec Issues", "value": "${{ steps.parse.outputs.tfsec_failed }}", "short": true},
+                  {"title": "Total Issues", "value": "${{ steps.parse.outputs.total_issues }}", "short": true},
+                  {"title": "View Details", "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}", "short": false}
+                ]
+              }]
+            }' \
+            "$SLACK_SECURITY_URL"
+        fi
 
     - name: Teams Alert - High Severity
       if: steps.parse.outputs.has_vulnerabilities == 'true'

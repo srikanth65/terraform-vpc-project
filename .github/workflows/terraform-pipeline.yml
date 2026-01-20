@@ -445,26 +445,31 @@ jobs:
     
     steps:
     - name: Slack Notification - Success
-      if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+      env:
+        SLACK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       run: |
-        curl -X POST -H 'Content-type: application/json' \
-          --data '{
-            "text": "✅ Infrastructure deployment successful!",
-            "attachments": [{
-              "color": "good",
-              "fields": [
-                {"title": "Repository", "value": "${{ github.repository }}", "short": true},
-                {"title": "Branch", "value": "${{ github.ref_name }}", "short": true},
-                {"title": "Commit", "value": "${{ github.sha }}", "short": true},
-                {"title": "Author", "value": "${{ github.actor }}", "short": true}
-              ]
-            }]
-          }' \
-          ${{ secrets.SLACK_WEBHOOK_URL }}
+        if [ -n "$SLACK_URL" ]; then
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{
+              "text": "✅ Infrastructure deployment successful!",
+              "attachments": [{
+                "color": "good",
+                "fields": [
+                  {"title": "Repository", "value": "${{ github.repository }}", "short": true},
+                  {"title": "Branch", "value": "${{ github.ref_name }}", "short": true},
+                  {"title": "Commit", "value": "${{ github.sha }}", "short": true},
+                  {"title": "Author", "value": "${{ github.actor }}", "short": true}
+                ]
+              }]
+            }' \
+            "$SLACK_URL"
+        fi
 
     - name: Teams Notification - Success
       uses: skitionek/notify-microsoft-teams@master
-      if: ${{ secrets.TEAMS_WEBHOOK_URL != '' }}
+      env:
+        TEAMS_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+      if: env.TEAMS_URL != ''
       with:
         webhook_url: ${{ secrets.TEAMS_WEBHOOK_URL }}
         overwrite: |
@@ -510,27 +515,32 @@ jobs:
     
     steps:
     - name: Slack Notification - Failure
-      if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+      env:
+        SLACK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       run: |
-        curl -X POST -H 'Content-type: application/json' \
-          --data '{
-            "text": "❌ Infrastructure deployment failed!",
-            "attachments": [{
-              "color": "danger",
-              "fields": [
-                {"title": "Repository", "value": "${{ github.repository }}", "short": true},
-                {"title": "Branch", "value": "${{ github.ref_name }}", "short": true},
-                {"title": "Commit", "value": "${{ github.sha }}", "short": true},
-                {"title": "Author", "value": "${{ github.actor }}", "short": true},
-                {"title": "View Logs", "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}", "short": false}
-              ]
-            }]
-          }' \
-          ${{ secrets.SLACK_WEBHOOK_URL }}
+        if [ -n "$SLACK_URL" ]; then
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{
+              "text": "❌ Infrastructure deployment failed!",
+              "attachments": [{
+                "color": "danger",
+                "fields": [
+                  {"title": "Repository", "value": "${{ github.repository }}", "short": true},
+                  {"title": "Branch", "value": "${{ github.ref_name }}", "short": true},
+                  {"title": "Commit", "value": "${{ github.sha }}", "short": true},
+                  {"title": "Author", "value": "${{ github.actor }}", "short": true},
+                  {"title": "View Logs", "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}", "short": false}
+                ]
+              }]
+            }' \
+            "$SLACK_URL"
+        fi
 
     - name: Teams Notification - Failure
       uses: skitionek/notify-microsoft-teams@master
-      if: ${{ secrets.TEAMS_WEBHOOK_URL != '' }}
+      env:
+        TEAMS_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+      if: env.TEAMS_URL != ''
       with:
         webhook_url: ${{ secrets.TEAMS_WEBHOOK_URL }}
         overwrite: |
