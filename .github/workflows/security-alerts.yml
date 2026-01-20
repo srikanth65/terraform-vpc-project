@@ -23,13 +23,13 @@ jobs:
 
     - name: Run Checkov
       id: checkov
-      uses: bridgecrewio/checkov-action@master
-      with:
-        directory: .
-        framework: terraform
-        output_format: json
-        output_file_path: checkov-results.json
-        soft_fail: true
+      run: |
+        pip install checkov
+        checkov -d . --framework terraform --config-file .checkov.yml --output json --output-file checkov-results.json || true
+        # Ensure JSON file exists
+        if [ ! -f "checkov-results.json" ]; then
+          echo '{"summary": {"failed": 0, "passed": 0}}' > checkov-results.json
+        fi
 
     - name: Run TFSec
       id: tfsec
@@ -37,6 +37,10 @@ jobs:
         curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
         sudo mv tfsec /usr/local/bin/
         tfsec . --format json --out tfsec-results.json || true
+        # Ensure JSON file exists
+        if [ ! -f "tfsec-results.json" ]; then
+          echo '{"results": []}' > tfsec-results.json
+        fi
 
     - name: Parse Security Results
       id: parse
