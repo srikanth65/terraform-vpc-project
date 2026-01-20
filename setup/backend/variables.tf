@@ -1,7 +1,7 @@
 variable "bucket_name" {
   description = "S3 bucket name for Terraform state"
   type        = string
-  default     = "terraform-state-vpc-project"
+  default     = ""
 }
 
 variable "dynamodb_table_name" {

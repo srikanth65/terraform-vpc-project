@@ -1,0 +1,84 @@
+name: Generate Infrastructure Report
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to report on'
+        required: true
+        default: 'dev'
+        type: choice
+        options: [dev, stage, prod, all]
+      report_type:
+        description: 'Type of report'
+        required: true
+        default: 'summary'
+        type: choice
+        options: [summary, detailed, security, cost]
+  schedule:
+    - cron: '0 9 * * MON'  # Weekly on Monday at 9 AM UTC
+
+env:
+  TF_VERSION: '1.6.0'
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  generate-report:
+    name: Generate Infrastructure Report
+    runs-on: ubuntu-latest
+    continue-on-error: true  # Don't fail pipeline if report fails
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: us-east-2
+
+    - name: Generate Report
+      id: report
+      run: |
+        chmod +x ./scripts/generate-report.sh
+        ./scripts/generate-report.sh "${{ github.event.inputs.environment || 'all' }}" "${{ github.event.inputs.report_type || 'summary' }}"
+
+    - name: Upload Report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: infrastructure-report-${{ github.run_number }}
+        path: reports/
+        retention-days: 30
+
+    - name: Comment Report Summary
+      uses: actions/github-script@v7
+      if: always() && github.event_name == 'workflow_dispatch'
+      with:
+        script: |
+          const fs = require('fs');
+          try {
+            const summary = fs.readFileSync('reports/summary.md', 'utf8');
+            
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Infrastructure Report - ${new Date().toISOString().split('T')[0]}`,
+              body: summary,
+              labels: ['report', 'infrastructure']
+            });
+            
+            console.log(`Report created as issue #${issue.data.number}`);
+          } catch (error) {
+            console.log('No summary file found or error creating issue:', error.message);
+          }

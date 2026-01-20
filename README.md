@@ -57,7 +57,8 @@ git push origin main
 ```
 
 📖 **Detailed Setup**: See [docs/INITIAL_SETUP.md](docs/INITIAL_SETUP.md)  
-📖 **GitHub Setup**: See [docs/GITHUB_SETUP.md](docs/GITHUB_SETUP.md)
+📖 **GitHub Setup**: See [docs/GITHUB_SETUP.md](docs/GITHUB_SETUP.md)  
+📖 **GitHub Actions**: See [docs/GITHUB_ACTIONS_GUIDE.md](docs/GITHUB_ACTIONS_GUIDE.md)
 
 ## ✨ Features
 
