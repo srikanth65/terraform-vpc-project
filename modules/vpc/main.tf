@@ -9,6 +9,18 @@ resource "aws_vpc" "main" {
   }
 }
 
+# Restrict default security group
+resource "aws_default_security_group" "default" {
+  vpc_id = aws_vpc.main.id
+
+  # No ingress rules (deny all inbound)
+  # No egress rules (deny all outbound)
+
+  tags = {
+    Name = "${var.environment}-default-sg-restricted"
+  }
+}
+
 resource "aws_subnet" "public" {
   count                   = length(var.public_subnets)
   vpc_id                  = aws_vpc.main.id
@@ -106,6 +118,7 @@ resource "aws_route_table_association" "private" {
 resource "aws_security_group" "web" {
   name_prefix = "${var.environment}-web-"
   vpc_id      = aws_vpc.main.id
+  description = "Security group for web servers"
 
   ingress {
     from_port   = 80
@@ -132,10 +145,19 @@ resource "aws_security_group" "web" {
   }
 
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTP outbound"
+  }
+
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTPS outbound"
   }
 
   tags = {
@@ -146,19 +168,30 @@ resource "aws_security_group" "web" {
 resource "aws_security_group" "app" {
   name_prefix = "${var.environment}-app-"
   vpc_id      = aws_vpc.main.id
+  description = "Security group for application servers"
 
   ingress {
     from_port       = 8080
     to_port         = 8080
     protocol        = "tcp"
     security_groups = [aws_security_group.web.id]
+    description     = "Application port from web tier"
   }
 
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTP outbound"
+  }
+
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTPS outbound"
   }
 
   tags = {
@@ -169,12 +202,14 @@ resource "aws_security_group" "app" {
 resource "aws_security_group" "db" {
   name_prefix = "${var.environment}-db-"
   vpc_id      = aws_vpc.main.id
+  description = "Security group for database servers"
 
   ingress {
     from_port       = 3306
     to_port         = 3306
     protocol        = "tcp"
     security_groups = [aws_security_group.app.id]
+    description     = "MySQL port from app tier"
   }
 
   tags = {
@@ -194,7 +229,22 @@ resource "aws_flow_log" "vpc" {
 resource "aws_cloudwatch_log_group" "vpc" {
   count             = var.enable_flow_logs ? 1 : 0
   name              = "/aws/vpc/${var.environment}-flow-logs"
-  retention_in_days = 14
+  retention_in_days = 365
+  kms_key_id        = aws_kms_key.flow_logs[0].arn
+
+  tags = {
+    Name = "${var.environment}-vpc-flow-logs"
+  }
+}
+
+resource "aws_kms_key" "flow_logs" {
+  count                   = var.enable_flow_logs ? 1 : 0
+  description             = "KMS key for VPC Flow Logs encryption"
+  deletion_window_in_days = 7
+
+  tags = {
+    Name = "${var.environment}-flow-logs-key"
+  }
 }
 
 resource "aws_iam_role" "flow_log" {
@@ -231,8 +281,11 @@ resource "aws_iam_role_policy" "flow_log" {
           "logs:DescribeLogGroups",
           "logs:DescribeLogStreams"
         ]
-        Effect   = "Allow"
-        Resource = "*"
+        Effect = "Allow"
+        Resource = [
+          aws_cloudwatch_log_group.vpc[0].arn,
+          "${aws_cloudwatch_log_group.vpc[0].arn}:*"
+        ]
       }
     ]
   })

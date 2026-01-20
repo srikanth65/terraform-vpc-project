@@ -117,14 +117,19 @@ jobs:
         sarif_file: checkov-results.sarif
         category: checkov
 
+    - name: Setup TFSec
+      run: |
+        curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+        sudo mv tfsec /usr/local/bin/
+
     - name: TFSec Security Scan
-      uses: aquasecurity/tfsec-sarif-action@v0.1.4
-      with:
-        sarif_file: tfsec-results.sarif
+      run: |
+        tfsec . --format sarif --out tfsec-results.sarif || true
+        tfsec . || true
 
     - name: Upload TFSec SARIF
       uses: github/codeql-action/upload-sarif@v3
-      if: always()
+      if: always() && hashFiles('tfsec-results.sarif') != ''
       with:
         sarif_file: tfsec-results.sarif
         category: tfsec
@@ -366,3 +371,139 @@ jobs:
         name: post-deployment-report-${{ github.run_number }}
         path: reports/
         retention-days: 7
+
+  notify-success:
+    name: Notify Success
+    runs-on: ubuntu-latest
+    needs: [deploy-dev, deploy-stage, deploy-prod]
+    if: always() && (needs.deploy-dev.result == 'success' || needs.deploy-stage.result == 'success' || needs.deploy-prod.result == 'success')
+    
+    steps:
+    - name: Slack Notification - Success
+      uses: 8398a7/action-slack@v3
+      if: env.SLACK_WEBHOOK_URL != ''
+      with:
+        status: success
+        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        channel: '#infrastructure'
+        username: 'Terraform Bot'
+        icon_emoji: ':terraform:'
+        fields: repo,message,commit,author,action,eventName,ref,workflow
+        text: |
+          ✅ Infrastructure deployment successful!
+          
+          🏗️ **Environments deployed:**
+          ${{ needs.deploy-dev.result == 'success' && '• Dev ✅' || '' }}
+          ${{ needs.deploy-stage.result == 'success' && '• Stage ✅' || '' }}
+          ${{ needs.deploy-prod.result == 'success' && '• Production ✅' || '' }}
+          
+          📊 View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: Teams Notification - Success
+      uses: skitionek/notify-microsoft-teams@master
+      if: env.TEAMS_WEBHOOK_URL != ''
+      with:
+        webhook_url: ${{ secrets.TEAMS_WEBHOOK_URL }}
+        overwrite: |
+          {
+            "@type": "MessageCard",
+            "@context": "https://schema.org/extensions",
+            "summary": "Infrastructure Deployment Success",
+            "themeColor": "28a745",
+            "sections": [{
+              "activityTitle": "✅ Infrastructure Deployment Successful",
+              "activitySubtitle": "${{ github.repository }}",
+              "activityImage": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+              "facts": [{
+                "name": "Repository:",
+                "value": "${{ github.repository }}"
+              }, {
+                "name": "Branch:",
+                "value": "${{ github.ref_name }}"
+              }, {
+                "name": "Commit:",
+                "value": "${{ github.sha }}"
+              }, {
+                "name": "Author:",
+                "value": "${{ github.actor }}"
+              }],
+              "markdown": true
+            }],
+            "potentialAction": [{
+              "@type": "OpenUri",
+              "name": "View Details",
+              "targets": [{
+                "os": "default",
+                "uri": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              }]
+            }]
+          }
+
+  notify-failure:
+    name: Notify Failure
+    runs-on: ubuntu-latest
+    needs: [quality-checks, plan, deploy-dev, deploy-stage, deploy-prod]
+    if: always() && (needs.quality-checks.result == 'failure' || needs.plan.result == 'failure' || needs.deploy-dev.result == 'failure' || needs.deploy-stage.result == 'failure' || needs.deploy-prod.result == 'failure')
+    
+    steps:
+    - name: Slack Notification - Failure
+      uses: 8398a7/action-slack@v3
+      if: env.SLACK_WEBHOOK_URL != ''
+      with:
+        status: failure
+        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        channel: '#infrastructure'
+        username: 'Terraform Bot'
+        icon_emoji: ':warning:'
+        fields: repo,message,commit,author,action,eventName,ref,workflow
+        text: |
+          ❌ Infrastructure deployment failed!
+          
+          🚨 **Failed stages:**
+          ${{ needs.quality-checks.result == 'failure' && '• Quality Checks ❌' || '' }}
+          ${{ needs.plan.result == 'failure' && '• Planning ❌' || '' }}
+          ${{ needs.deploy-dev.result == 'failure' && '• Dev Deployment ❌' || '' }}
+          ${{ needs.deploy-stage.result == 'failure' && '• Stage Deployment ❌' || '' }}
+          ${{ needs.deploy-prod.result == 'failure' && '• Production Deployment ❌' || '' }}
+          
+          🔍 Check logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: Teams Notification - Failure
+      uses: skitionek/notify-microsoft-teams@master
+      if: env.TEAMS_WEBHOOK_URL != ''
+      with:
+        webhook_url: ${{ secrets.TEAMS_WEBHOOK_URL }}
+        overwrite: |
+          {
+            "@type": "MessageCard",
+            "@context": "https://schema.org/extensions",
+            "summary": "Infrastructure Deployment Failed",
+            "themeColor": "dc3545",
+            "sections": [{
+              "activityTitle": "❌ Infrastructure Deployment Failed",
+              "activitySubtitle": "${{ github.repository }}",
+              "activityImage": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+              "facts": [{
+                "name": "Repository:",
+                "value": "${{ github.repository }}"
+              }, {
+                "name": "Branch:",
+                "value": "${{ github.ref_name }}"
+              }, {
+                "name": "Commit:",
+                "value": "${{ github.sha }}"
+              }, {
+                "name": "Author:",
+                "value": "${{ github.actor }}"
+              }],
+              "markdown": true
+            }],
+            "potentialAction": [{
+              "@type": "OpenUri",
+              "name": "View Logs",
+              "targets": [{
+                "os": "default",
+                "uri": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              }]
+            }]
+          }

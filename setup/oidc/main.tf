@@ -60,17 +60,84 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
       {
         Effect = "Allow"
         Action = [
-          "ec2:*",
-          "logs:*",
+          "ec2:Describe*",
+          "ec2:CreateVpc",
+          "ec2:DeleteVpc",
+          "ec2:ModifyVpcAttribute",
+          "ec2:CreateSubnet",
+          "ec2:DeleteSubnet",
+          "ec2:CreateInternetGateway",
+          "ec2:DeleteInternetGateway",
+          "ec2:AttachInternetGateway",
+          "ec2:DetachInternetGateway",
+          "ec2:CreateNatGateway",
+          "ec2:DeleteNatGateway",
+          "ec2:AllocateAddress",
+          "ec2:ReleaseAddress",
+          "ec2:CreateRouteTable",
+          "ec2:DeleteRouteTable",
+          "ec2:CreateRoute",
+          "ec2:DeleteRoute",
+          "ec2:AssociateRouteTable",
+          "ec2:DisassociateRouteTable",
+          "ec2:CreateSecurityGroup",
+          "ec2:DeleteSecurityGroup",
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:AuthorizeSecurityGroupEgress",
+          "ec2:RevokeSecurityGroupIngress",
+          "ec2:RevokeSecurityGroupEgress",
+          "ec2:CreateFlowLogs",
+          "ec2:DeleteFlowLogs",
+          "ec2:CreateTags",
+          "ec2:DeleteTags"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:DeleteLogGroup",
+          "logs:PutRetentionPolicy",
+          "logs:DescribeLogGroups"
+        ]
+        Resource = "arn:aws:logs:us-east-2:*:log-group:/aws/vpc/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:CreateRole",
+          "iam:DeleteRole",
+          "iam:GetRole",
+          "iam:PassRole",
+          "iam:PutRolePolicy",
+          "iam:DeleteRolePolicy",
+          "iam:ListAttachedRolePolicies",
+          "iam:ListRolePolicies"
+        ]
+        Resource = "arn:aws:iam::*:role/*-flow-log-role"
+      },
+      {
+        Effect = "Allow"
+        Action = [
           "s3:GetObject",
           "s3:PutObject",
           "s3:DeleteObject",
-          "s3:ListBucket",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          "arn:aws:s3:::terraform-state-vpc-project-*",
+          "arn:aws:s3:::terraform-state-vpc-project-*/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
           "dynamodb:GetItem",
           "dynamodb:PutItem",
           "dynamodb:DeleteItem"
         ]
-        Resource = "*"
+        Resource = "arn:aws:dynamodb:us-east-2:*:table/terraform-locks"
       }
     ]
   })

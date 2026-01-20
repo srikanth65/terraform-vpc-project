@@ -1,0 +1,161 @@
+name: Cost Monitoring Alerts
+
+on:
+  schedule:
+    - cron: '0 9 * * MON'  # Weekly on Monday at 9 AM
+  workflow_dispatch:
+    inputs:
+      threshold:
+        description: 'Cost threshold in USD'
+        required: false
+        default: '100'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  cost-monitoring:
+    name: AWS Cost Monitoring
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: us-east-2
+
+    - name: Get Cost Data
+      id: cost
+      run: |
+        # Get current month costs
+        START_DATE=$(date -d "$(date +%Y-%m-01)" +%Y-%m-%d)
+        END_DATE=$(date +%Y-%m-%d)
+        
+        # Get cost data from AWS
+        COST_DATA=$(aws ce get-cost-and-usage \
+          --time-period Start=$START_DATE,End=$END_DATE \
+          --granularity MONTHLY \
+          --metrics BlendedCost \
+          --group-by Type=DIMENSION,Key=SERVICE \
+          --query 'ResultsByTime[0].Total.BlendedCost.Amount' \
+          --output text)
+        
+        CURRENT_COST=$(printf "%.2f" $COST_DATA)
+        THRESHOLD=${{ github.event.inputs.threshold || '100' }}
+        
+        echo "current_cost=$CURRENT_COST" >> $GITHUB_OUTPUT
+        echo "threshold=$THRESHOLD" >> $GITHUB_OUTPUT
+        
+        # Check if cost exceeds threshold
+        if (( $(echo "$CURRENT_COST > $THRESHOLD" | bc -l) )); then
+          echo "cost_alert=true" >> $GITHUB_OUTPUT
+        else
+          echo "cost_alert=false" >> $GITHUB_OUTPUT
+        fi
+        
+        # Get service breakdown
+        aws ce get-cost-and-usage \
+          --time-period Start=$START_DATE,End=$END_DATE \
+          --granularity MONTHLY \
+          --metrics BlendedCost \
+          --group-by Type=DIMENSION,Key=SERVICE \
+          --query 'ResultsByTime[0].Groups[?Metrics.BlendedCost.Amount>`5`].[Keys[0],Metrics.BlendedCost.Amount]' \
+          --output table > cost-breakdown.txt
+
+    - name: Slack Cost Alert
+      if: steps.cost.outputs.cost_alert == 'true'
+      uses: 8398a7/action-slack@v3
+      with:
+        status: custom
+        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        channel: '#infrastructure'
+        username: 'Cost Monitor Bot'
+        icon_emoji: ':money_with_wings:'
+        custom_payload: |
+          {
+            "attachments": [{
+              "color": "warning",
+              "title": "💰 AWS Cost Alert",
+              "text": "Monthly AWS costs have exceeded the threshold!",
+              "fields": [
+                {
+                  "title": "Current Month Cost",
+                  "value": "$$${{ steps.cost.outputs.current_cost }}",
+                  "short": true
+                },
+                {
+                  "title": "Threshold",
+                  "value": "$$${{ steps.cost.outputs.threshold }}",
+                  "short": true
+                },
+                {
+                  "title": "Repository",
+                  "value": "${{ github.repository }}",
+                  "short": true
+                },
+                {
+                  "title": "Region",
+                  "value": "us-east-2",
+                  "short": true
+                }
+              ],
+              "actions": [{
+                "type": "button",
+                "text": "View AWS Console",
+                "url": "https://console.aws.amazon.com/billing/home#/bills"
+              }]
+            }]
+          }
+
+    - name: Teams Cost Alert
+      if: steps.cost.outputs.cost_alert == 'true'
+      uses: skitionek/notify-microsoft-teams@master
+      with:
+        webhook_url: ${{ secrets.TEAMS_WEBHOOK_URL }}
+        overwrite: |
+          {
+            "@type": "MessageCard",
+            "@context": "https://schema.org/extensions",
+            "summary": "AWS Cost Alert",
+            "themeColor": "ff9500",
+            "sections": [{
+              "activityTitle": "💰 AWS Cost Alert",
+              "activitySubtitle": "Monthly costs exceeded threshold",
+              "activityImage": "https://cdn-icons-png.flaticon.com/512/2721/2721279.png",
+              "facts": [{
+                "name": "Current Cost:",
+                "value": "$${{ steps.cost.outputs.current_cost }}"
+              }, {
+                "name": "Threshold:",
+                "value": "$${{ steps.cost.outputs.threshold }}"
+              }, {
+                "name": "Repository:",
+                "value": "${{ github.repository }}"
+              }, {
+                "name": "Region:",
+                "value": "us-east-2"
+              }],
+              "markdown": true
+            }],
+            "potentialAction": [{
+              "@type": "OpenUri",
+              "name": "View AWS Billing",
+              "targets": [{
+                "os": "default",
+                "uri": "https://console.aws.amazon.com/billing/home#/bills"
+              }]
+            }]
+          }
+
+    - name: Upload Cost Report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: cost-report-${{ github.run_number }}
+        path: cost-breakdown.txt
+        retention-days: 30

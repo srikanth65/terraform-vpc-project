@@ -1,0 +1,33 @@
+# Checkov security exceptions
+# These are acceptable risks for this infrastructure setup
+
+# CKV_AWS_79: Ensure Instance Metadata Service Version 1 is not enabled
+# Not applicable - no EC2 instances in this VPC setup
+
+# CKV_AWS_23: Ensure every security group rule has a description
+# Fixed - all security group rules now have descriptions
+
+# CKV_AWS_25: Ensure no security groups allow ingress from 0.0.0.0:0 to port 22
+# Fixed - SSH only allowed from specific IP (24.84.5.125/32)
+
+# CKV_AWS_24: Ensure no security groups allow ingress from 0.0.0.0:0 to port 80
+# Fixed - HTTP only allowed from specific IP (24.84.5.125/32)
+
+# CKV_AWS_65: Ensure no security groups allow egress from 0.0.0.0:0 to port -1
+# Fixed - specific egress rules for HTTP/HTTPS only
+
+# CKV_AWS_144: Ensure that S3 bucket has cross-region replication enabled
+# Skip - not required for Terraform state bucket in single region setup
+--skip-check CKV_AWS_144
+
+# CKV_AWS_18: Ensure the S3 bucket has access logging enabled
+# Fixed - access logging now enabled
+
+# CKV_AWS_21: Ensure the S3 bucket has versioning enabled
+# Already enabled
+
+# CKV_AWS_145: Ensure that S3 buckets are encrypted with KMS by default
+# Fixed - now using KMS encryption
+
+# CKV_AWS_119: Ensure DynamoDB Tables are encrypted using a KMS Customer Managed CMK
+# Fixed - DynamoDB now uses KMS encryption

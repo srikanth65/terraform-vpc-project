@@ -35,7 +35,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" 
   bucket = aws_s3_bucket.terraform_state.id
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+      kms_master_key_id = aws_kms_key.terraform_state.arn
+      sse_algorithm     = "aws:kms"
     }
   }
 }
@@ -49,6 +50,39 @@ resource "aws_s3_bucket_public_access_block" "terraform_state" {
   restrict_public_buckets = true
 }
 
+# KMS key for encryption
+resource "aws_kms_key" "terraform_state" {
+  description             = "KMS key for Terraform state encryption"
+  deletion_window_in_days = 7
+
+  tags = {
+    Name = "terraform-state-key"
+  }
+}
+
+resource "aws_kms_alias" "terraform_state" {
+  name          = "alias/terraform-state"
+  target_key_id = aws_kms_key.terraform_state.key_id
+}
+
+# S3 bucket logging
+resource "aws_s3_bucket" "access_logs" {
+  bucket = "${aws_s3_bucket.terraform_state.bucket}-access-logs"
+}
+
+resource "aws_s3_bucket_logging" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  target_bucket = aws_s3_bucket.access_logs.id
+  target_prefix = "access-logs/"
+}
+
+# S3 bucket notification
+resource "aws_s3_bucket_notification" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  eventbridge = true
+}
 
 resource "aws_dynamodb_table" "terraform_locks" {
   name         = "terraform-locks"
@@ -58,5 +92,14 @@ resource "aws_dynamodb_table" "terraform_locks" {
   attribute {
     name = "LockID"
     type = "S"
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.terraform_state.arn
+  }
+
+  tags = {
+    Name = "terraform-locks"
   }
 }
