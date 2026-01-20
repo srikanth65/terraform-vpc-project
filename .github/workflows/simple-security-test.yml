@@ -36,8 +36,11 @@ jobs:
         tflint --recursive || echo "TFLint found issues"
 
     - name: Test Slack Notification
-      if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+      env:
+        SLACK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       run: |
-        curl -X POST -H 'Content-type: application/json' \
-          --data '{"text":"🧪 Security test completed successfully!"}' \
-          ${{ secrets.SLACK_WEBHOOK_URL }}
+        if [ -n "$SLACK_URL" ]; then
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{"text":"🧪 Security test completed successfully!"}' \
+            "$SLACK_URL"
+        fi
