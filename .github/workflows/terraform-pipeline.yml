@@ -397,7 +397,7 @@ jobs:
     
     steps:
     - name: Slack Notification - Success
-      if: secrets.SLACK_WEBHOOK_URL != ''
+      if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
       run: |
         curl -X POST -H 'Content-type: application/json' \
           --data '{
@@ -416,7 +416,7 @@ jobs:
 
     - name: Teams Notification - Success
       uses: skitionek/notify-microsoft-teams@master
-      if: secrets.TEAMS_WEBHOOK_URL != ''
+      if: ${{ secrets.TEAMS_WEBHOOK_URL != '' }}
       with:
         webhook_url: ${{ secrets.TEAMS_WEBHOOK_URL }}
         overwrite: |
@@ -462,7 +462,7 @@ jobs:
     
     steps:
     - name: Slack Notification - Failure
-      if: secrets.SLACK_WEBHOOK_URL != ''
+      if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
       run: |
         curl -X POST -H 'Content-type: application/json' \
           --data '{
@@ -482,7 +482,7 @@ jobs:
 
     - name: Teams Notification - Failure
       uses: skitionek/notify-microsoft-teams@master
-      if: secrets.TEAMS_WEBHOOK_URL != ''
+      if: ${{ secrets.TEAMS_WEBHOOK_URL != '' }}
       with:
         webhook_url: ${{ secrets.TEAMS_WEBHOOK_URL }}
         overwrite: |

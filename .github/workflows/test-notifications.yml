@@ -48,7 +48,7 @@ jobs:
         fi
 
     - name: Test Teams Notification
-      if: secrets.TEAMS_WEBHOOK_URL != ''
+      if: ${{ secrets.TEAMS_WEBHOOK_URL != '' }}
       run: |
         curl -H "Content-Type: application/json" \
           -d '{"text":"🧪 Test notification from Terraform Infrastructure Bot - GitHub Actions is working!"}' \

@@ -67,7 +67,7 @@ jobs:
         fi
 
     - name: Slack Alert - High Severity
-      if: steps.parse.outputs.has_vulnerabilities == 'true' && secrets.SLACK_SECURITY_WEBHOOK_URL != ''
+      if: ${{ steps.parse.outputs.has_vulnerabilities == 'true' && secrets.SLACK_SECURITY_WEBHOOK_URL != '' }}
       run: |
         curl -X POST -H 'Content-type: application/json' \
           --data '{
