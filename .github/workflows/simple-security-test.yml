@@ -1,0 +1,43 @@
+name: Simple Security Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  security-test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Test Checkov
+      run: |
+        pip install checkov
+        checkov -d . --framework terraform --config-file .checkov.yml --compact || echo "Checkov found issues"
+
+    - name: Test TFSec
+      run: |
+        curl -s https://api.github.com/repos/aquasecurity/tfsec/releases/latest \
+        | grep "browser_download_url.*linux-amd64" \
+        | cut -d '"' -f 4 \
+        | head -1 \
+        | xargs wget -O tfsec
+        chmod +x tfsec
+        ./tfsec . || echo "TFSec found issues"
+
+    - name: Test TFLint
+      uses: terraform-linters/setup-tflint@v4
+      with:
+        tflint_version: latest
+
+    - name: Run TFLint
+      run: |
+        tflint --init
+        tflint --recursive || echo "TFLint found issues"
+
+    - name: Test Slack Notification
+      if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+      run: |
+        curl -X POST -H 'Content-type: application/json' \
+          --data '{"text":"🧪 Security test completed successfully!"}' \
+          ${{ secrets.SLACK_WEBHOOK_URL }}
