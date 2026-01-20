@@ -5,9 +5,9 @@ terraform {
       version = "~> 5.0"
     }
   }
-  
+
   backend "s3" {
-    bucket         = "terraform-state-vpc-project"
+    # bucket will be configured during terraform init
     key            = "dev/terraform.tfstate"
     region         = "us-east-2"
     dynamodb_table = "terraform-locks"
