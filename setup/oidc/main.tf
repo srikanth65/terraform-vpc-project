@@ -1,4 +1,17 @@
 # Create IAM role for GitHub Actions OIDC
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.aws_region
+}
+
 resource "aws_iam_openid_connect_provider" "github" {
   url = "https://token.actions.githubusercontent.com"
 
@@ -29,7 +42,7 @@ resource "aws_iam_role" "github_actions" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:YOUR_GITHUB_USERNAME/terraform-vpc-project:*"
+            "token.actions.githubusercontent.com:sub" = "repo:${var.github_repository}:*"
           }
         }
       }
@@ -61,8 +74,4 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
       }
     ]
   })
-}
-
-output "github_role_arn" {
-  value = aws_iam_role.github_actions.arn
 }

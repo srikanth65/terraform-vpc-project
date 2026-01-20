@@ -1,0 +1,22 @@
+# Global owners for all files
+* @terraform-admins
+
+# Infrastructure code
+/environments/ @terraform-admins @infrastructure-reviewers
+/modules/ @terraform-admins @infrastructure-reviewers
+/setup/ @terraform-admins
+
+# CI/CD workflows
+/.github/workflows/ @terraform-admins @devops-team
+
+# Documentation
+/docs/ @terraform-admins @technical-writers
+
+# Security-related files
+/setup/oidc/ @terraform-admins @security-team
+/.github/workflows/terraform-pipeline.yml @terraform-admins @security-team
+
+# Configuration files
+.tflint.hcl @terraform-admins
+*.tf @infrastructure-reviewers
+*.tfvars @terraform-admins
