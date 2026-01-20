@@ -60,7 +60,13 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
       {
         Effect = "Allow"
         Action = [
-          "ec2:Describe*",
+          "ec2:Describe*"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
           "ec2:CreateVpc",
           "ec2:DeleteVpc",
           "ec2:ModifyVpcAttribute",
@@ -89,9 +95,25 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
           "ec2:CreateFlowLogs",
           "ec2:DeleteFlowLogs",
           "ec2:CreateTags",
-          "ec2:DeleteTags"
+          "ec2:DeleteTags",
+          "ec2:RunInstances",
+          "ec2:TerminateInstances",
+          "ec2:StopInstances",
+          "ec2:StartInstances"
         ]
-        Resource = "*"
+        Resource = [
+          "arn:aws:ec2:us-east-2:*:vpc/*",
+          "arn:aws:ec2:us-east-2:*:subnet/*",
+          "arn:aws:ec2:us-east-2:*:internet-gateway/*",
+          "arn:aws:ec2:us-east-2:*:natgateway/*",
+          "arn:aws:ec2:us-east-2:*:elastic-ip/*",
+          "arn:aws:ec2:us-east-2:*:route-table/*",
+          "arn:aws:ec2:us-east-2:*:security-group/*",
+          "arn:aws:ec2:us-east-2:*:instance/*",
+          "arn:aws:ec2:us-east-2:*:volume/*",
+          "arn:aws:ec2:us-east-2:*:network-interface/*",
+          "arn:aws:ec2:us-east-2:*:image/*"
+        ]
       },
       {
         Effect = "Allow"
@@ -120,15 +142,34 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
       {
         Effect = "Allow"
         Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:DeleteObject",
-          "s3:ListBucket"
+          "kms:Decrypt",
+          "kms:DescribeKey",
+          "kms:GenerateDataKey"
         ]
         Resource = [
-          "arn:aws:s3:::terraform-state-vpc-project-*",
-          "arn:aws:s3:::terraform-state-vpc-project-*/*"
+          "arn:aws:kms:us-east-2:*:key/*"
         ]
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "s3.us-east-2.amazonaws.com"
+          }
+        }
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ]
+        Resource = "arn:aws:s3:::terraform-state-vpc-project-*/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket"
+        ]
+        Resource = "arn:aws:s3:::terraform-state-vpc-project-*"
       },
       {
         Effect = "Allow"
