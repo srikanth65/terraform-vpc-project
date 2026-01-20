@@ -67,30 +67,24 @@ jobs:
         fi
 
     - name: Slack Alert - High Severity
-      if: steps.parse.outputs.has_vulnerabilities == 'true'
-      uses: 8398a7/action-slack@v3
-      with:
-        status: failure
-        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-        channel: '#security-alerts'
-        username: 'Security Bot'
-        icon_emoji: ':warning:'
-        text: |
-          🚨 **SECURITY VULNERABILITIES DETECTED** 🚨
-          
-          📊 **Scan Results:**
-          • Checkov: ${{ steps.parse.outputs.checkov_failed }} failed, ${{ steps.parse.outputs.checkov_passed }} passed
-          • TFSec: ${{ steps.parse.outputs.tfsec_failed }} issues found
-          
-          🔍 **Total Issues:** ${{ steps.parse.outputs.total_issues }}
-          
-          📋 **Repository:** ${{ github.repository }}
-          🌿 **Branch:** ${{ github.ref_name }}
-          👤 **Triggered by:** ${{ github.actor }}
-          
-          🔗 **View Details:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          
-          ⚠️ **Action Required:** Please review and fix security issues immediately!
+      if: steps.parse.outputs.has_vulnerabilities == 'true' && secrets.SLACK_SECURITY_WEBHOOK_URL != ''
+      run: |
+        curl -X POST -H 'Content-type: application/json' \
+          --data '{
+            "text": "🚨 SECURITY VULNERABILITIES DETECTED",
+            "attachments": [{
+              "color": "danger",
+              "fields": [
+                {"title": "Repository", "value": "${{ github.repository }}", "short": true},
+                {"title": "Branch", "value": "${{ github.ref_name }}", "short": true},
+                {"title": "Checkov Issues", "value": "${{ steps.parse.outputs.checkov_failed }}", "short": true},
+                {"title": "TFSec Issues", "value": "${{ steps.parse.outputs.tfsec_failed }}", "short": true},
+                {"title": "Total Issues", "value": "${{ steps.parse.outputs.total_issues }}", "short": true},
+                {"title": "View Details", "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}", "short": false}
+              ]
+            }]
+          }' \
+          ${{ secrets.SLACK_SECURITY_WEBHOOK_URL }}
 
     - name: Teams Alert - High Severity
       if: steps.parse.outputs.has_vulnerabilities == 'true'

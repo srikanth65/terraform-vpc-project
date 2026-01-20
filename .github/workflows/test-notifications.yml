@@ -7,15 +7,44 @@ jobs:
   test-slack:
     runs-on: ubuntu-latest
     steps:
-    - name: Test Slack Notification
+    - name: Test Main Slack Notification
       run: |
         if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
           curl -X POST -H 'Content-type: application/json' \
-            --data '{"text":"🧪 Test notification from Terraform Infrastructure Bot - GitHub Actions is working!"}' \
+            --data '{
+              "text": "🧪 Test notification from Terraform Infrastructure Bot",
+              "attachments": [{
+                "color": "good",
+                "fields": [
+                  {"title": "Status", "value": "GitHub Actions is working!", "short": true},
+                  {"title": "Repository", "value": "${{ github.repository }}", "short": true}
+                ]
+              }]
+            }' \
             ${{ secrets.SLACK_WEBHOOK_URL }}
-          echo "✅ Slack notification sent"
+          echo "✅ Main Slack notification sent"
         else
           echo "❌ SLACK_WEBHOOK_URL secret not found"
+        fi
+
+    - name: Test Security Slack Notification
+      run: |
+        if [ -n "${{ secrets.SLACK_SECURITY_WEBHOOK_URL }}" ]; then
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{
+              "text": "🧪 Test security notification from Terraform Infrastructure Bot",
+              "attachments": [{
+                "color": "warning",
+                "fields": [
+                  {"title": "Status", "value": "Security alerts working!", "short": true},
+                  {"title": "Repository", "value": "${{ github.repository }}", "short": true}
+                ]
+              }]
+            }' \
+            ${{ secrets.SLACK_SECURITY_WEBHOOK_URL }}
+          echo "✅ Security Slack notification sent"
+        else
+          echo "❌ SLACK_SECURITY_WEBHOOK_URL secret not found"
         fi
 
     - name: Test Teams Notification

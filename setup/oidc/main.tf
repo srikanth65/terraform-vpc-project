@@ -101,10 +101,10 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
           "ec2:DeleteFlowLogs",
           "ec2:CreateTags",
           "ec2:DeleteTags",
-          "ec2:RunInstances",
-          "ec2:TerminateInstances",
-          "ec2:StopInstances",
-          "ec2:StartInstances"
+          "ec2:CreateNetworkInterface",
+          "ec2:DeleteNetworkInterface",
+          "ec2:AttachNetworkInterface",
+          "ec2:DetachNetworkInterface"
         ]
         Resource = [
           "arn:aws:ec2:us-east-2:*:vpc/*",
@@ -114,10 +114,7 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
           "arn:aws:ec2:us-east-2:*:elastic-ip/*",
           "arn:aws:ec2:us-east-2:*:route-table/*",
           "arn:aws:ec2:us-east-2:*:security-group/*",
-          "arn:aws:ec2:us-east-2:*:instance/*",
-          "arn:aws:ec2:us-east-2:*:volume/*",
-          "arn:aws:ec2:us-east-2:*:network-interface/*",
-          "arn:aws:ec2:us-east-2:*:image/*"
+          "arn:aws:ec2:us-east-2:*:network-interface/*"
         ]
       },
       {

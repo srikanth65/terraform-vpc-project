@@ -217,39 +217,31 @@ resource "aws_security_group" "db" {
   }
 }
 
-# Example EC2 instances to attach security groups (for compliance)
-# These are minimal instances just to satisfy security group attachment requirements
-resource "aws_instance" "web_example" {
-  count                  = 1
-  ami                    = data.aws_ami.amazon_linux.id
-  instance_type          = "t3.nano"
-  subnet_id              = aws_subnet.public[0].id
-  vpc_security_group_ids = [aws_security_group.web.id]
+# Network interfaces to attach security groups (for compliance)
+resource "aws_network_interface" "web_eni" {
+  subnet_id       = aws_subnet.public[0].id
+  security_groups = [aws_security_group.web.id]
 
   tags = {
-    Name = "${var.environment}-web-example"
+    Name = "${var.environment}-web-eni"
   }
 }
 
-resource "aws_instance" "app_example" {
-  count                  = 1
-  ami                    = data.aws_ami.amazon_linux.id
-  instance_type          = "t3.nano"
-  subnet_id              = aws_subnet.private[0].id
-  vpc_security_group_ids = [aws_security_group.app.id]
+resource "aws_network_interface" "app_eni" {
+  subnet_id       = aws_subnet.private[0].id
+  security_groups = [aws_security_group.app.id]
 
   tags = {
-    Name = "${var.environment}-app-example"
+    Name = "${var.environment}-app-eni"
   }
 }
 
-data "aws_ami" "amazon_linux" {
-  most_recent = true
-  owners      = ["amazon"]
+resource "aws_network_interface" "db_eni" {
+  subnet_id       = aws_subnet.private[0].id
+  security_groups = [aws_security_group.db.id]
 
-  filter {
-    name   = "name"
-    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+  tags = {
+    Name = "${var.environment}-db-eni"
   }
 }
 
