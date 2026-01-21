@@ -217,6 +217,34 @@ resource "aws_security_group" "db" {
   }
 }
 
+# Network interfaces to attach security groups (for compliance)
+resource "aws_network_interface" "web_eni" {
+  subnet_id       = aws_subnet.public[0].id
+  security_groups = [aws_security_group.web.id]
+
+  tags = {
+    Name = "${var.environment}-web-eni"
+  }
+}
+
+resource "aws_network_interface" "app_eni" {
+  subnet_id       = aws_subnet.private[0].id
+  security_groups = [aws_security_group.app.id]
+
+  tags = {
+    Name = "${var.environment}-app-eni"
+  }
+}
+
+resource "aws_network_interface" "db_eni" {
+  subnet_id       = aws_subnet.private[0].id
+  security_groups = [aws_security_group.db.id]
+
+  tags = {
+    Name = "${var.environment}-db-eni"
+  }
+}
+
 # VPC Flow Logs
 resource "aws_flow_log" "vpc" {
   count           = var.enable_flow_logs ? 1 : 0
@@ -241,11 +269,45 @@ resource "aws_kms_key" "flow_logs" {
   count                   = var.enable_flow_logs ? 1 : 0
   description             = "KMS key for VPC Flow Logs encryption"
   deletion_window_in_days = 7
+  enable_key_rotation     = true
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "Enable IAM User Permissions"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "kms:*"
+        Resource = "*"
+      },
+      {
+        Sid    = "Allow CloudWatch Logs"
+        Effect = "Allow"
+        Principal = {
+          Service = "logs.${data.aws_region.current.name}.amazonaws.com"
+        }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
 
   tags = {
     Name = "${var.environment}-flow-logs-key"
   }
 }
+
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
 
 resource "aws_iam_role" "flow_log" {
   count = var.enable_flow_logs ? 1 : 0

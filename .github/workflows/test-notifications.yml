@@ -1,0 +1,47 @@
+name: Test Slack Notifications
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-slack:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Test Main Slack Notification
+      env:
+        SLACK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      run: |
+        if [ -n "$SLACK_URL" ]; then
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{"text":"🧪 Test notification from Terraform Infrastructure Bot - Main channel"}' \
+            "$SLACK_URL"
+          echo "✅ Main Slack notification sent"
+        else
+          echo "❌ SLACK_WEBHOOK_URL secret not found"
+        fi
+
+    - name: Test Security Slack Notification
+      env:
+        SLACK_SECURITY_URL: ${{ secrets.SLACK_SECURITY_WEBHOOK_URL }}
+      run: |
+        if [ -n "$SLACK_SECURITY_URL" ]; then
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{"text":"🧪 Test security notification from Terraform Infrastructure Bot"}' \
+            "$SLACK_SECURITY_URL"
+          echo "✅ Security Slack notification sent"
+        else
+          echo "❌ SLACK_SECURITY_WEBHOOK_URL secret not found"
+        fi
+
+    - name: Test Teams Notification
+      env:
+        TEAMS_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+      run: |
+        if [ -n "$TEAMS_URL" ]; then
+          curl -H "Content-Type: application/json" \
+            -d '{"text":"🧪 Test Teams notification from Terraform Infrastructure Bot"}' \
+            "$TEAMS_URL"
+          echo "✅ Teams notification sent"
+        else
+          echo "❌ TEAMS_WEBHOOK_URL secret not found"
+        fi

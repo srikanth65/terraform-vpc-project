@@ -1,0 +1,43 @@
+name: Workflow Status Check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  status-check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Check Active Workflows
+      run: |
+        echo "✅ Active workflows:"
+        ls -la .github/workflows/
+        echo ""
+        echo "🔍 Checking for SARIF references..."
+        if grep -r "sarif\|codeql" .github/workflows/ --exclude="*-old.yml" || true; then
+          echo "⚠️  Found SARIF references in active workflows"
+        else
+          echo "✅ No SARIF references in active workflows"
+        fi
+        echo ""
+        echo "🔍 Checking for secrets syntax..."
+        if grep -r "if:.*secrets\." .github/workflows/ --exclude="*-old.yml" || true; then
+          echo "⚠️  Found potential secrets syntax issues"
+        else
+          echo "✅ No secrets syntax issues found"
+        fi
+
+    - name: Test Slack Notification
+      env:
+        SLACK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      run: |
+        if [ -n "$SLACK_URL" ]; then
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{"text":"✅ Workflow status check completed - All systems operational!"}' \
+            "$SLACK_URL"
+          echo "✅ Slack notification sent"
+        else
+          echo "ℹ️  SLACK_WEBHOOK_URL not configured"
+        fi

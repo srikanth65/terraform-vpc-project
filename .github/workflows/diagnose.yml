@@ -1,0 +1,45 @@
+name: Quick Diagnostic
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: us-east-2
+
+    - name: Check AWS Connection
+      run: |
+        echo "🔍 Testing AWS connection..."
+        aws sts get-caller-identity
+        echo "✅ AWS connection works"
+
+    - name: Check S3 Bucket
+      run: |
+        echo "🔍 Checking S3 bucket..."
+        aws s3 ls s3://terraform-state-vpc-project-7bc0e5bf || echo "❌ Bucket not accessible"
+        echo "✅ S3 check complete"
+
+    - name: Check DynamoDB Table
+      run: |
+        echo "🔍 Checking DynamoDB table..."
+        aws dynamodb describe-table --table-name terraform-locks --region us-east-2 || echo "❌ Table not accessible"
+        echo "✅ DynamoDB check complete"
+
+    - name: Test Terraform Init (Dev)
+      run: |
+        echo "🔍 Testing terraform init in dev..."
+        cd environments/dev
+        terraform init || echo "❌ Terraform init failed"

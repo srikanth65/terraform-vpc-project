@@ -7,7 +7,7 @@ terraform {
   }
 
   backend "s3" {
-    # bucket will be configured during terraform init
+    bucket         = "terraform-state-vpc-project-7bc0e5bf"
     key            = "stage/terraform.tfstate"
     region         = "us-east-2"
     dynamodb_table = "terraform-locks"

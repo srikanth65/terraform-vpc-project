@@ -19,8 +19,11 @@
 
 # Variable definition files (can contain sensitive information like passwords, keys, etc.)
 # Exclude all by default, but consider specific overrides if necessary
-*.tfvars
+# *.tfvars  # Commented out - we need our environment tfvars files
 *.tfvars.json
+
+# Allow specific environment tfvars files
+!terraform-*.tfvars
 
 # Crash log files
 crash.log

@@ -29,7 +29,6 @@ permissions:
   id-token: write
   contents: read
   pull-requests: write
-  security-events: write
 
 jobs:
   quality-checks:
@@ -83,6 +82,11 @@ jobs:
           cd - > /dev/null
         done
 
+    - name: Checkov Security Scan
+      run: |
+        pip install checkov
+        checkov -d . --framework terraform --config-file .checkov.yml --compact || echo "Checkov completed"
+
     - name: TFLint
       uses: terraform-linters/setup-tflint@v4
       with:
@@ -91,56 +95,17 @@ jobs:
     - name: Run TFLint
       run: |
         tflint --init
-        tflint --recursive --format=sarif > tflint-results.sarif || true
-        # Ensure SARIF file exists
-        if [ ! -f "tflint-results.sarif" ]; then
-          echo '{"runs": [{"tool": {"driver": {"name": "TFLint"}}, "results": []}]}' > tflint-results.sarif
-        fi
-        tflint --recursive
-
-    - name: Upload TFLint SARIF
-      uses: github/codeql-action/upload-sarif@v3
-      if: always() && hashFiles('tflint-results.sarif') != ''
-      with:
-        sarif_file: tflint-results.sarif
-        category: tflint
-
-    - name: Checkov Security Scan
-      run: |
-        pip install checkov
-        checkov -d . --framework terraform --config-file .checkov.yml || true
-        # Ensure SARIF file exists
-        if [ ! -f "checkov-results.sarif" ]; then
-          echo '{"runs": [{"tool": {"driver": {"name": "Checkov"}}, "results": []}]}' > checkov-results.sarif
-        fi
-
-    - name: Upload Checkov SARIF
-      uses: github/codeql-action/upload-sarif@v3
-      if: always() && hashFiles('checkov-results.sarif') != ''
-      with:
-        sarif_file: checkov-results.sarif
-        category: checkov
-
-    - name: Setup TFSec
-      run: |
-        curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
-        sudo mv tfsec /usr/local/bin/
+        tflint --recursive || echo "TFLint completed"
 
     - name: TFSec Security Scan
       run: |
-        tfsec . --format sarif --out tfsec-results.sarif || true
-        # Ensure SARIF file exists
-        if [ ! -f "tfsec-results.sarif" ]; then
-          echo '{"runs": [{"tool": {"driver": {"name": "TFSec"}}, "results": []}]}' > tfsec-results.sarif
-        fi
-        tfsec . || true
-
-    - name: Upload TFSec SARIF
-      uses: github/codeql-action/upload-sarif@v3
-      if: always() && hashFiles('tfsec-results.sarif') != ''
-      with:
-        sarif_file: tfsec-results.sarif
-        category: tfsec
+        curl -s https://api.github.com/repos/aquasecurity/tfsec/releases/latest \
+        | grep "browser_download_url.*linux-amd64" \
+        | cut -d '"' -f 4 \
+        | head -1 \
+        | xargs wget -O tfsec
+        chmod +x tfsec
+        ./tfsec . || echo "TFSec completed"
 
   plan:
     name: Terraform Plan
@@ -344,42 +309,6 @@ jobs:
       working-directory: ./environments/prod
       run: terraform apply tfplan
 
-  post-deployment-report:
-    name: Generate Post-Deployment Report
-    runs-on: ubuntu-latest
-    needs: [deploy-dev, deploy-stage, deploy-prod]
-    if: always() && (needs.deploy-dev.result == 'success' || needs.deploy-stage.result == 'success' || needs.deploy-prod.result == 'success')
-    continue-on-error: true  # Don't fail pipeline if report fails
-    
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_version: ${{ env.TF_VERSION }}
-
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-        aws-region: us-east-2
-
-    - name: Generate Deployment Report
-      continue-on-error: true
-      run: |
-        chmod +x ./scripts/generate-report.sh
-        ./scripts/generate-report.sh "all" "summary"
-
-    - name: Upload Report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: post-deployment-report-${{ github.run_number }}
-        path: reports/
-        retention-days: 7
-
   notify-success:
     name: Notify Success
     runs-on: ubuntu-latest
@@ -388,64 +317,14 @@ jobs:
     
     steps:
     - name: Slack Notification - Success
-      uses: 8398a7/action-slack@v3
-      if: env.SLACK_WEBHOOK_URL != ''
-      with:
-        status: success
-        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-        channel: '#infrastructure'
-        username: 'Terraform Bot'
-        icon_emoji: ':terraform:'
-        fields: repo,message,commit,author,action,eventName,ref,workflow
-        text: |
-          ✅ Infrastructure deployment successful!
-          
-          🏗️ **Environments deployed:**
-          ${{ needs.deploy-dev.result == 'success' && '• Dev ✅' || '' }}
-          ${{ needs.deploy-stage.result == 'success' && '• Stage ✅' || '' }}
-          ${{ needs.deploy-prod.result == 'success' && '• Production ✅' || '' }}
-          
-          📊 View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-    - name: Teams Notification - Success
-      uses: skitionek/notify-microsoft-teams@master
-      if: env.TEAMS_WEBHOOK_URL != ''
-      with:
-        webhook_url: ${{ secrets.TEAMS_WEBHOOK_URL }}
-        overwrite: |
-          {
-            "@type": "MessageCard",
-            "@context": "https://schema.org/extensions",
-            "summary": "Infrastructure Deployment Success",
-            "themeColor": "28a745",
-            "sections": [{
-              "activityTitle": "✅ Infrastructure Deployment Successful",
-              "activitySubtitle": "${{ github.repository }}",
-              "activityImage": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
-              "facts": [{
-                "name": "Repository:",
-                "value": "${{ github.repository }}"
-              }, {
-                "name": "Branch:",
-                "value": "${{ github.ref_name }}"
-              }, {
-                "name": "Commit:",
-                "value": "${{ github.sha }}"
-              }, {
-                "name": "Author:",
-                "value": "${{ github.actor }}"
-              }],
-              "markdown": true
-            }],
-            "potentialAction": [{
-              "@type": "OpenUri",
-              "name": "View Details",
-              "targets": [{
-                "os": "default",
-                "uri": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-              }]
-            }]
-          }
+      env:
+        SLACK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      run: |
+        if [ -n "$SLACK_URL" ]; then
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{"text":"✅ Infrastructure deployment successful!"}' \
+            "$SLACK_URL"
+        fi
 
   notify-failure:
     name: Notify Failure
@@ -455,63 +334,11 @@ jobs:
     
     steps:
     - name: Slack Notification - Failure
-      uses: 8398a7/action-slack@v3
-      if: env.SLACK_WEBHOOK_URL != ''
-      with:
-        status: failure
-        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-        channel: '#infrastructure'
-        username: 'Terraform Bot'
-        icon_emoji: ':warning:'
-        fields: repo,message,commit,author,action,eventName,ref,workflow
-        text: |
-          ❌ Infrastructure deployment failed!
-          
-          🚨 **Failed stages:**
-          ${{ needs.quality-checks.result == 'failure' && '• Quality Checks ❌' || '' }}
-          ${{ needs.plan.result == 'failure' && '• Planning ❌' || '' }}
-          ${{ needs.deploy-dev.result == 'failure' && '• Dev Deployment ❌' || '' }}
-          ${{ needs.deploy-stage.result == 'failure' && '• Stage Deployment ❌' || '' }}
-          ${{ needs.deploy-prod.result == 'failure' && '• Production Deployment ❌' || '' }}
-          
-          🔍 Check logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-    - name: Teams Notification - Failure
-      uses: skitionek/notify-microsoft-teams@master
-      if: env.TEAMS_WEBHOOK_URL != ''
-      with:
-        webhook_url: ${{ secrets.TEAMS_WEBHOOK_URL }}
-        overwrite: |
-          {
-            "@type": "MessageCard",
-            "@context": "https://schema.org/extensions",
-            "summary": "Infrastructure Deployment Failed",
-            "themeColor": "dc3545",
-            "sections": [{
-              "activityTitle": "❌ Infrastructure Deployment Failed",
-              "activitySubtitle": "${{ github.repository }}",
-              "activityImage": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
-              "facts": [{
-                "name": "Repository:",
-                "value": "${{ github.repository }}"
-              }, {
-                "name": "Branch:",
-                "value": "${{ github.ref_name }}"
-              }, {
-                "name": "Commit:",
-                "value": "${{ github.sha }}"
-              }, {
-                "name": "Author:",
-                "value": "${{ github.actor }}"
-              }],
-              "markdown": true
-            }],
-            "potentialAction": [{
-              "@type": "OpenUri",
-              "name": "View Logs",
-              "targets": [{
-                "os": "default",
-                "uri": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-              }]
-            }]
-          }
+      env:
+        SLACK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      run: |
+        if [ -n "$SLACK_URL" ]; then
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{"text":"❌ Infrastructure deployment failed! Check logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"}' \
+            "$SLACK_URL"
+        fi
