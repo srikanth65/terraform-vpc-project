@@ -1,0 +1,45 @@
+name: Test Subnet Permissions
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test-permissions:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.6.0
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: us-east-2
+
+    - name: Test Terraform Apply (Dev)
+      working-directory: ./environments/dev
+      run: |
+        echo "🔍 Testing terraform apply in dev environment..."
+        terraform init
+        terraform plan -var-file="terraform-dev.tfvars" -out=tfplan
+        terraform apply tfplan
+        echo "✅ Terraform apply successful!"
+
+    - name: Notify Success
+      env:
+        SLACK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      run: |
+        if [ -n "$SLACK_URL" ]; then
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{"text":"✅ Infrastructure deployment successful! All permissions working correctly."}' \
+            "$SLACK_URL"
+        fi
