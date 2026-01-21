@@ -1,0 +1,133 @@
+name: 🔥 Destroy All Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_destroy:
+        description: 'Type "DESTROY" to confirm destruction of ALL environments'
+        required: true
+        type: string
+      environments:
+        description: 'Environments to destroy'
+        required: true
+        default: 'dev,stage,prod'
+        type: choice
+        options:
+          - 'dev'
+          - 'stage' 
+          - 'prod'
+          - 'dev,stage'
+          - 'stage,prod'
+          - 'dev,stage,prod'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  confirm-destroy:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm_destroy == 'DESTROY'
+    steps:
+      - name: ⚠️ Destruction Confirmation
+        run: |
+          echo "🔥 DESTROYING INFRASTRUCTURE IN: ${{ github.event.inputs.environments }}"
+          echo "⚠️  This action is IRREVERSIBLE!"
+          echo "📋 Environments selected: ${{ github.event.inputs.environments }}"
+
+  destroy-dev:
+    needs: confirm-destroy
+    if: contains(github.event.inputs.environments, 'dev')
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-2
+
+      - name: 🔥 Destroy Dev Environment
+        working-directory: environments/dev
+        run: |
+          terraform init
+          terraform destroy -var-file="terraform-dev.tfvars" -auto-approve
+          echo "✅ Dev environment destroyed"
+
+  destroy-stage:
+    needs: confirm-destroy
+    if: contains(github.event.inputs.environments, 'stage')
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-2
+
+      - name: 🔥 Destroy Stage Environment
+        working-directory: environments/stage
+        run: |
+          terraform init
+          terraform destroy -var-file="terraform-stage.tfvars" -auto-approve
+          echo "✅ Stage environment destroyed"
+
+  destroy-prod:
+    needs: confirm-destroy
+    if: contains(github.event.inputs.environments, 'prod')
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-2
+
+      - name: 🔥 Destroy Prod Environment
+        working-directory: environments/prod
+        run: |
+          terraform init
+          terraform destroy -var-file="terraform-prod.tfvars" -auto-approve
+          echo "✅ Prod environment destroyed"
+
+  cleanup-summary:
+    needs: [destroy-dev, destroy-stage, destroy-prod]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📊 Destruction Summary
+        run: |
+          echo "🔥 INFRASTRUCTURE DESTRUCTION COMPLETE"
+          echo "📋 Requested environments: ${{ github.event.inputs.environments }}"
+          echo "✅ Dev: ${{ needs.destroy-dev.result }}"
+          echo "✅ Stage: ${{ needs.destroy-stage.result }}"  
+          echo "✅ Prod: ${{ needs.destroy-prod.result }}"
+          echo ""
+          echo "⚠️  Note: Backend resources (S3, DynamoDB) are preserved"
+          echo "🔧 To destroy backend: Run destroy-backend workflow separately"
