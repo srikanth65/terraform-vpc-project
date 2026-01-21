@@ -138,16 +138,7 @@ jobs:
     - name: Terraform Plan
       working-directory: ./environments/${{ matrix.environment }}
       run: |
-        ls -la
-        echo "Current directory: $(pwd)"
-        echo "Looking for: terraform-${{ matrix.environment }}.tfvars"
-        if [ -f "terraform-${{ matrix.environment }}.tfvars" ]; then
-          echo "✅ Found tfvars file"
-          terraform plan -var-file="terraform-${{ matrix.environment }}.tfvars" -out=tfplan
-        else
-          echo "❌ tfvars file not found, trying without var-file"
-          terraform plan -out=tfplan
-        fi
+        terraform plan -var-file="terraform-${{ matrix.environment }}.tfvars" -out=tfplan
         terraform show -json tfplan > plan.json
 
     - name: Upload Plan
