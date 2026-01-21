@@ -1,0 +1,57 @@
+name: Test Backend Configuration
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.6.0
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: us-east-2
+
+    - name: Test Dev Backend
+      working-directory: ./environments/dev
+      run: |
+        echo "🔍 Testing dev backend configuration..."
+        terraform init
+        echo "✅ Dev backend initialization successful!"
+
+    - name: Test Stage Backend
+      working-directory: ./environments/stage
+      run: |
+        echo "🔍 Testing stage backend configuration..."
+        terraform init
+        echo "✅ Stage backend initialization successful!"
+
+    - name: Test Prod Backend
+      working-directory: ./environments/prod
+      run: |
+        echo "🔍 Testing prod backend configuration..."
+        terraform init
+        echo "✅ Prod backend initialization successful!"
+
+    - name: Notify Success
+      env:
+        SLACK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      run: |
+        if [ -n "$SLACK_URL" ]; then
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{"text":"✅ Backend configuration test successful! All environments can initialize properly."}' \
+            "$SLACK_URL"
+        fi
