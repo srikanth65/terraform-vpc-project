@@ -1,0 +1,118 @@
+name: 🗑️ Destroy Backend Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_backend_destroy:
+        description: 'Type "DESTROY-BACKEND" to confirm backend destruction'
+        required: true
+        type: string
+      destroy_state_bucket:
+        description: 'Also destroy S3 state bucket (⚠️ IRREVERSIBLE)'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  confirm-backend-destroy:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm_backend_destroy == 'DESTROY-BACKEND'
+    steps:
+      - name: ⚠️ Backend Destruction Confirmation
+        run: |
+          echo "🗑️ DESTROYING BACKEND INFRASTRUCTURE"
+          echo "⚠️  This will destroy:"
+          echo "   - DynamoDB locks table"
+          echo "   - S3 access logs bucket"
+          if [ "${{ github.event.inputs.destroy_state_bucket }}" == "true" ]; then
+            echo "   - S3 state bucket (⚠️ IRREVERSIBLE - ALL TERRAFORM STATE LOST)"
+          else
+            echo "   - S3 state bucket will be preserved"
+          fi
+
+  destroy-backend:
+    needs: confirm-backend-destroy
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-2
+
+      - name: 🗑️ Destroy Backend Resources
+        working-directory: setup/backend
+        run: |
+          terraform init
+          
+          if [ "${{ github.event.inputs.destroy_state_bucket }}" == "true" ]; then
+            echo "🔥 Destroying ALL backend resources including state bucket"
+            terraform destroy -auto-approve
+          else
+            echo "🔥 Destroying backend resources (preserving state bucket)"
+            # Remove state bucket from destruction
+            terraform state rm aws_s3_bucket.terraform_state || true
+            terraform state rm aws_s3_bucket_versioning.terraform_state || true
+            terraform state rm aws_s3_bucket_encryption.terraform_state || true
+            terraform state rm aws_s3_bucket_public_access_block.terraform_state || true
+            terraform destroy -auto-approve
+          fi
+          
+          echo "✅ Backend destruction complete"
+
+  cleanup-oidc:
+    needs: destroy-backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-2
+
+      - name: 🗑️ Destroy OIDC Resources
+        working-directory: setup/oidc
+        run: |
+          terraform init
+          terraform destroy -auto-approve
+          echo "✅ OIDC resources destroyed"
+
+  final-summary:
+    needs: [destroy-backend, cleanup-oidc]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📊 Complete Destruction Summary
+        run: |
+          echo "🔥 COMPLETE INFRASTRUCTURE DESTRUCTION FINISHED"
+          echo ""
+          echo "✅ Backend: ${{ needs.destroy-backend.result }}"
+          echo "✅ OIDC: ${{ needs.cleanup-oidc.result }}"
+          echo ""
+          if [ "${{ github.event.inputs.destroy_state_bucket }}" == "true" ]; then
+            echo "⚠️  ALL TERRAFORM STATE HAS BEEN DESTROYED"
+            echo "🔄 To rebuild: Run setup scripts from scratch"
+          else
+            echo "💾 Terraform state bucket preserved"
+            echo "🔄 To rebuild: Infrastructure can be redeployed"
+          fi
