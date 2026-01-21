@@ -280,7 +280,7 @@ resource "aws_kms_key" "flow_logs" {
         Principal = {
           AWS = [
             "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root",
-            data.aws_caller_identity.current.arn
+            "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/github-actions-terraform-role"
           ]
         }
         Action   = "kms:*"
