@@ -1,0 +1,25 @@
+name: Test File Structure
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-files:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Check File Structure
+      run: |
+        echo "🔍 Checking project structure..."
+        find . -name "*.tfvars" -type f
+        echo ""
+        echo "📁 Dev environment:"
+        ls -la environments/dev/
+        echo ""
+        echo "📁 Stage environment:"
+        ls -la environments/stage/
+        echo ""
+        echo "📁 Prod environment:"
+        ls -la environments/prod/
