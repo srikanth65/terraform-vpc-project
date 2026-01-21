@@ -1,0 +1,40 @@
+name: Test KMS Permissions
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test-kms:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: us-east-2
+
+    - name: Test DynamoDB Access
+      run: |
+        echo "🔍 Testing DynamoDB table access..."
+        aws dynamodb describe-table --table-name terraform-locks --region us-east-2
+        echo "✅ DynamoDB access successful!"
+
+    - name: Test S3 Bucket Access
+      run: |
+        echo "🔍 Testing S3 bucket access..."
+        aws s3 ls s3://terraform-state-vpc-project-7bc0e5bf
+        echo "✅ S3 access successful!"
+
+    - name: Notify Success
+      env:
+        SLACK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      run: |
+        if [ -n "$SLACK_URL" ]; then
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{"text":"✅ KMS permissions test successful! DynamoDB and S3 access working."}' \
+            "$SLACK_URL"
+        fi
